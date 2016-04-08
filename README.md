@@ -1,8 +1,8 @@
 # flume-http-sink
 
-HTTP Sink Implementation for Apache Flume.
-
 [![Build Status](https://travis-ci.org/hmrc/flume-http-sink.svg?branch=master)](https://travis-ci.org/hmrc/flume-http-sink) [ ![Download](https://api.bintray.com/packages/hmrc/releases/flume-http-sink/images/download.svg) ](https://bintray.com/hmrc/releases/flume-http-sink/_latestVersion)
+
+**HTTP Sink Implementation for Apache Flume.**
 
 Behaviour of this sink is that it will take events from the channel, and
 send those events to a remote service using an HTTP POST request. The event
@@ -64,6 +64,14 @@ cd flume-http-sink
 sbt clean package
 cp target/flume-http-sink-{version}.jar {flume_home}/lib/flume-http-sink-{version}.jar
 ```
+
+### Todo
+
+* Add unit tests for HttpSink.
+* Make the integration tests run standalone without having to run a separate Flume instance.
+* Persistent HTTP Connections (current each event opens a new connection).
+* Configurable behaviour for HTTP response status codes.
+* Performance tests.
 
 
 ### License
