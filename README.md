@@ -67,8 +67,6 @@ cp target/flume-http-sink-{version}.jar {flume_home}/lib/flume-http-sink-{versio
 
 ### Todo
 
-* Add unit tests for HttpSink.
-* Make the integration tests run standalone without having to run a separate Flume instance.
 * Persistent HTTP Connections (current each event opens a new connection).
 * Configurable behaviour for HTTP response status codes.
 * Performance tests.
