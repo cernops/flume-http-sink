@@ -22,7 +22,8 @@ libraryDependencies ++= Seq(
       exclude("org.apache.thrift", "libthrift"),
     "junit" % "junit-dep" % "4.10" % "test",
     "com.github.tomakehurst" % "wiremock" % "1.56" % "test",
-    "com.novocode" % "junit-interface" % "0.11" % "test"
+    "com.novocode" % "junit-interface" % "0.11" % "test",
+    "org.mockito" % "mockito-all" % "1.10.19" % "test"
 )
 
 resolvers += Resolver.mavenLocal

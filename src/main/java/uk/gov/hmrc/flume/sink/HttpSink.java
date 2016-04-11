@@ -72,33 +72,23 @@ public class HttpSink extends AbstractSink implements Configurable {
 			throw new IllegalArgumentException("Endpoint URL invalid", e);
 		}
 
-		String configuredConnectTimeout = context.getString("connectTimeout", "");
-		LOG.info("Read connect timeout from configuration : " + configuredConnectTimeout);
-
-		if (!configuredConnectTimeout.isEmpty()) {
-			connectTimeout = Integer.parseInt(configuredConnectTimeout);
+		connectTimeout = context.getInteger("connectTimeout", DEFAULT_CONNECT_TIMEOUT);
+		if (connectTimeout <= 0) {
+			throw new IllegalArgumentException("Connect timeout must be a non-zero and positive");
 		}
+		LOG.info("Using connect timeout : " + connectTimeout);
 
-		String configuredRequestTimeout = context.getString("requestTimeout", "");
-		LOG.info("Read request timeout from configuration : " + configuredRequestTimeout);
-
-		if (!configuredRequestTimeout.isEmpty()) {
-			requestTimeout = Integer.parseInt(configuredRequestTimeout);
+		requestTimeout = context.getInteger("requestTimeout", DEFAULT_REQUEST_TIMEOUT);
+		if (requestTimeout <= 0) {
+			throw new IllegalArgumentException("Request timeout must be a non-zero and positive");
 		}
+		LOG.info("Using request timeout : " + requestTimeout);
 
-		String configuredAcceptHeader = context.getString("acceptHeader", "");
-		LOG.info("Read Accept header value from configuration : " + configuredAcceptHeader);
+		acceptHeader = context.getString("acceptHeader", DEFAULT_ACCEPT_HEADER);
+		LOG.info("Using Accept header value : " + acceptHeader);
 
-		if (!configuredAcceptHeader.isEmpty()) {
-			acceptHeader = configuredAcceptHeader;
-		}
-
-		String configuredContentTypeHeader = context.getString("contentTypeHeader", "");
-		LOG.info("Read Content-Type header value from configuration : " + configuredContentTypeHeader);
-
-		if (!configuredContentTypeHeader.isEmpty()) {
-			contentTypeHeader = configuredContentTypeHeader;
-		}
+		contentTypeHeader = context.getString("contentTypeHeader", DEFAULT_CONTENT_TYPE);
+		LOG.info("Using Content-Type header value : " + contentTypeHeader);
 	}
 
 	@Override
