@@ -78,7 +78,7 @@ public class HttpSinkIT {
     }
 
     @Test
-    public void ensureAuditEventsResentOn503Failure() throws Exception {
+    public void ensureEventsResentOn503Failure() throws Exception {
         String errorScenario = "Error Scenario";
 
         service.stubFor(post(urlEqualTo("/datastream"))
@@ -102,7 +102,7 @@ public class HttpSinkIT {
     }
 
     @Test
-    public void ensureAuditEventsResentOnNetworkFailure() throws Exception {
+    public void ensureEventsResentOnNetworkFailure() throws Exception {
         String errorScenario = "Error Scenario";
 
         service.stubFor(post(urlEqualTo("/datastream"))
@@ -126,7 +126,7 @@ public class HttpSinkIT {
     }
 
     @Test
-    public void ensureAuditEventsResentOnConnectionTimeout() throws Exception {
+    public void ensureEventsResentOnConnectionTimeout() throws Exception {
         service.addSocketAcceptDelay(new RequestDelaySpec(CONNECT_TIMEOUT));
         service.addMockServiceRequestListener((request, response) -> {
                 service.addSocketAcceptDelay(new RequestDelaySpec(0));
@@ -145,7 +145,7 @@ public class HttpSinkIT {
     }
 
     @Test
-    public void ensureAuditEventsResentOnRequestTimeout() throws Exception {
+    public void ensureEventsResentOnRequestTimeout() throws Exception {
         String errorScenario = "Error Scenario";
 
         service.stubFor(post(urlEqualTo("/datastream"))
