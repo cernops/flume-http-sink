@@ -48,155 +48,155 @@ import java.net.URL;
  */
 public class HttpSink extends AbstractSink implements Configurable {
 
-	private static final Logger LOG = Logger.getLogger(HttpSink.class);
+    private static final Logger LOG = Logger.getLogger(HttpSink.class);
 
-	private static final int DEFAULT_CONNECT_TIMEOUT = 5000;
-	private static final int DEFAULT_REQUEST_TIMEOUT = 5000;
-	private static final String DEFAULT_CONTENT_TYPE = "text/plain";
-	private static final String DEFAULT_ACCEPT_HEADER = "text/plain";
+    private static final int DEFAULT_CONNECT_TIMEOUT = 5000;
+    private static final int DEFAULT_REQUEST_TIMEOUT = 5000;
+    private static final String DEFAULT_CONTENT_TYPE = "text/plain";
+    private static final String DEFAULT_ACCEPT_HEADER = "text/plain";
 
-	private URL endpointUrl;
-	private HttpURLConnection httpClient;
-	private int connectTimeout = DEFAULT_CONNECT_TIMEOUT;
-	private int requestTimeout = DEFAULT_REQUEST_TIMEOUT;
-	private String contentTypeHeader = DEFAULT_CONTENT_TYPE;
-	private String acceptHeader = DEFAULT_ACCEPT_HEADER;
+    private URL endpointUrl;
+    private HttpURLConnection httpClient;
+    private int connectTimeout = DEFAULT_CONNECT_TIMEOUT;
+    private int requestTimeout = DEFAULT_REQUEST_TIMEOUT;
+    private String contentTypeHeader = DEFAULT_CONTENT_TYPE;
+    private String acceptHeader = DEFAULT_ACCEPT_HEADER;
 
-	public void configure(Context context) {
-		String configuredEndpoint = context.getString("endpoint", "");
-		LOG.info("Read endpoint URL from configuration : " + configuredEndpoint);
+    public void configure(Context context) {
+        String configuredEndpoint = context.getString("endpoint", "");
+        LOG.info("Read endpoint URL from configuration : " + configuredEndpoint);
 
-		try {
-			endpointUrl = new URL(configuredEndpoint);
-		} catch (MalformedURLException e) {
-			throw new IllegalArgumentException("Endpoint URL invalid", e);
-		}
+        try {
+            endpointUrl = new URL(configuredEndpoint);
+        } catch (MalformedURLException e) {
+            throw new IllegalArgumentException("Endpoint URL invalid", e);
+        }
 
-		connectTimeout = context.getInteger("connectTimeout", DEFAULT_CONNECT_TIMEOUT);
-		if (connectTimeout <= 0) {
-			throw new IllegalArgumentException("Connect timeout must be a non-zero and positive");
-		}
-		LOG.info("Using connect timeout : " + connectTimeout);
+        connectTimeout = context.getInteger("connectTimeout", DEFAULT_CONNECT_TIMEOUT);
+        if (connectTimeout <= 0) {
+            throw new IllegalArgumentException("Connect timeout must be a non-zero and positive");
+        }
+        LOG.info("Using connect timeout : " + connectTimeout);
 
-		requestTimeout = context.getInteger("requestTimeout", DEFAULT_REQUEST_TIMEOUT);
-		if (requestTimeout <= 0) {
-			throw new IllegalArgumentException("Request timeout must be a non-zero and positive");
-		}
-		LOG.info("Using request timeout : " + requestTimeout);
+        requestTimeout = context.getInteger("requestTimeout", DEFAULT_REQUEST_TIMEOUT);
+        if (requestTimeout <= 0) {
+            throw new IllegalArgumentException("Request timeout must be a non-zero and positive");
+        }
+        LOG.info("Using request timeout : " + requestTimeout);
 
-		acceptHeader = context.getString("acceptHeader", DEFAULT_ACCEPT_HEADER);
-		LOG.info("Using Accept header value : " + acceptHeader);
+        acceptHeader = context.getString("acceptHeader", DEFAULT_ACCEPT_HEADER);
+        LOG.info("Using Accept header value : " + acceptHeader);
 
-		contentTypeHeader = context.getString("contentTypeHeader", DEFAULT_CONTENT_TYPE);
-		LOG.info("Using Content-Type header value : " + contentTypeHeader);
-	}
+        contentTypeHeader = context.getString("contentTypeHeader", DEFAULT_CONTENT_TYPE);
+        LOG.info("Using Content-Type header value : " + contentTypeHeader);
+    }
 
-	@Override
-	public void start() {
-		LOG.info("Starting HttpSink");
-	}
+    @Override
+    public void start() {
+        LOG.info("Starting HttpSink");
+    }
 
-	@Override
-	public void stop() {
-		LOG.info("Stopping HttpSink");
-	}
+    @Override
+    public void stop() {
+        LOG.info("Stopping HttpSink");
+    }
 
-	public Status process() throws EventDeliveryException {
-		Status status = null;
+    public Status process() throws EventDeliveryException {
+        Status status = null;
 
-		Channel ch = getChannel();
-		Transaction txn = ch.getTransaction();
-		txn.begin();
-		try {
-			Event event = ch.take();
-			if (event != null && event.getBody().length > 0) {
+        Channel ch = getChannel();
+        Transaction txn = ch.getTransaction();
+        txn.begin();
+        try {
+            Event event = ch.take();
+            if (event != null && event.getBody().length > 0) {
 
-				LOG.debug("Sending request : " + new String(event.getBody()));
+                LOG.debug("Sending request : " + new String(event.getBody()));
 
-				try {
-					httpClient = (HttpURLConnection) endpointUrl.openConnection();
-					httpClient.setRequestMethod("POST");
-					httpClient.setRequestProperty("Content-Type", contentTypeHeader);
-					httpClient.setRequestProperty("Accept", acceptHeader);
-					httpClient.setConnectTimeout(connectTimeout);
-					httpClient.setReadTimeout(requestTimeout);
-					httpClient.setDoOutput(true);
-					httpClient.setDoInput(true);
-					httpClient.connect();
+                try {
+                    httpClient = (HttpURLConnection) endpointUrl.openConnection();
+                    httpClient.setRequestMethod("POST");
+                    httpClient.setRequestProperty("Content-Type", contentTypeHeader);
+                    httpClient.setRequestProperty("Accept", acceptHeader);
+                    httpClient.setConnectTimeout(connectTimeout);
+                    httpClient.setReadTimeout(requestTimeout);
+                    httpClient.setDoOutput(true);
+                    httpClient.setDoInput(true);
+                    httpClient.connect();
 
-					OutputStream outputStream = httpClient.getOutputStream();
-					outputStream.write(event.getBody());
-					outputStream.flush();
-					outputStream.close();
+                    OutputStream outputStream = httpClient.getOutputStream();
+                    outputStream.write(event.getBody());
+                    outputStream.flush();
+                    outputStream.close();
 
-					int statusCode = httpClient.getResponseCode();
-					LOG.debug("Got status code : " + statusCode);
+                    int statusCode = httpClient.getResponseCode();
+                    LOG.debug("Got status code : " + statusCode);
 
-					httpClient.getInputStream().close();
-					LOG.debug("Response processed and closed");
+                    httpClient.getInputStream().close();
+                    LOG.debug("Response processed and closed");
 
-					if (statusCode == HttpURLConnection.HTTP_OK) {
-						txn.commit();
-						status = Status.READY;
+                    if (statusCode == HttpURLConnection.HTTP_OK) {
+                        txn.commit();
+                        status = Status.READY;
 
-						LOG.debug("Successful write, event consumed");
+                        LOG.debug("Successful write, event consumed");
 
-					} else if (statusCode == HttpURLConnection.HTTP_UNAVAILABLE) {
-						txn.rollback();
-						status = Status.BACKOFF;
+                    } else if (statusCode == HttpURLConnection.HTTP_UNAVAILABLE) {
+                        txn.rollback();
+                        status = Status.BACKOFF;
 
-						LOG.debug("Service Unavailable (503), retrying");
+                        LOG.debug("Service Unavailable (503), retrying");
 
-					} else if (statusCode >= 400 && statusCode < 500) {
-						txn.commit();
-						status = Status.READY;
+                    } else if (statusCode >= 400 && statusCode < 500) {
+                        txn.commit();
+                        status = Status.READY;
 
-						LOG.error(String.format("Bad request, returned status code %s, event consumed", statusCode));
+                        LOG.error(String.format("Bad request, returned status code %s, event consumed", statusCode));
 
-					} else if (statusCode == -1) {
-						txn.rollback();
-						status = Status.BACKOFF;
+                    } else if (statusCode == -1) {
+                        txn.rollback();
+                        status = Status.BACKOFF;
 
-						LOG.debug("Malformed response returned from server, retrying");
+                        LOG.debug("Malformed response returned from server, retrying");
 
-					} else {
-						txn.commit();
-						status = Status.READY;
+                    } else {
+                        txn.commit();
+                        status = Status.READY;
 
-						LOG.error(String.format("Unexpected status code %s returned for event", statusCode));
-					}
+                        LOG.error(String.format("Unexpected status code %s returned for event", statusCode));
+                    }
 
-				} catch (IOException e) {
-					txn.rollback();
+                } catch (IOException e) {
+                    txn.rollback();
 
-					LOG.error("Error opening connection, or request timed out", e);
+                    LOG.error("Error opening connection, or request timed out", e);
 
-					status = Status.BACKOFF;
-				}
+                    status = Status.BACKOFF;
+                }
 
-			} else {
-				txn.commit();
-				status = Status.BACKOFF;
+            } else {
+                txn.commit();
+                status = Status.BACKOFF;
 
-				LOG.debug("Processed empty event");
-			}
+                LOG.debug("Processed empty event");
+            }
 
-		} catch (Throwable t) {
-			txn.rollback();
+        } catch (Throwable t) {
+            txn.rollback();
 
-			LOG.error("Error sending HTTP request, retrying", t);
+            LOG.error("Error sending HTTP request, retrying", t);
 
-			status = Status.BACKOFF;
+            status = Status.BACKOFF;
 
-			// re-throw all Errors
-			if (t instanceof Error) {
-				throw (Error)t;
-			}
+            // re-throw all Errors
+            if (t instanceof Error) {
+                throw (Error)t;
+            }
 
-		} finally {
-			txn.close();
-		}
+        } finally {
+            txn.close();
+        }
 
-		return status;
-	}
+        return status;
+    }
 }

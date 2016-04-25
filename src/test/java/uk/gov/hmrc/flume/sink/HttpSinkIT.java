@@ -15,7 +15,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
@@ -27,7 +26,6 @@ import java.util.concurrent.TimeUnit;
  * Runs a set of tests against a correctly configured external running Flume
  * instance.
  */
-@Category(IntegrationTest.class)
 @RunWith(MockitoJUnitRunner.class)
 public class HttpSinkIT {
 
