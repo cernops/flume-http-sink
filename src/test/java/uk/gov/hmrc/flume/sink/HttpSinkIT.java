@@ -11,6 +11,7 @@ import com.github.tomakehurst.wiremock.http.Fault;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import org.apache.flume.*;
 import org.apache.flume.event.SimpleEvent;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -30,7 +31,7 @@ import java.util.concurrent.TimeUnit;
 @RunWith(MockitoJUnitRunner.class)
 public class HttpSinkIT {
 
-    private static final int RESPONSE_TIMEOUT = 2000;
+    private static final int RESPONSE_TIMEOUT = 4000;
     private static final int CONNECT_TIMEOUT = 2000;
 
     private HttpSink httpSink;
@@ -47,7 +48,7 @@ public class HttpSinkIT {
             Context context = new Context();
             context.put("endpoint", "http://localhost:8080/datastream");
             context.put("requestTimeout", "2000");
-            context.put("connectionTimeout", "2000");
+            context.put("connectTimeout", "2000");
             context.put("acceptHeader", "application/json");
             context.put("contentTypeHeader", "application/json");
 
@@ -58,35 +59,28 @@ public class HttpSinkIT {
         }
     }
 
+    @After
+    public void waitForShutdown() throws InterruptedException {
+        new CountDownLatch(1).await(200, TimeUnit.MILLISECONDS);
+    }
+
     @Rule
     public WireMockRule service = new WireMockRule(wireMockConfig().port(8080));
 
     @Test
     public void ensureSuccessfulMessageDelivery() throws Exception {
-        final CountDownLatch gate = new CountDownLatch(1);
-
-        service.addMockServiceRequestListener((request, response) -> gate.countDown());
-
         service.stubFor(post(urlEqualTo("/datastream"))
                 .withRequestBody(equalToJson(event("SUCCESS")))
                 .willReturn(aResponse().withStatus(200)));
 
         addEventToChannel(event("SUCCESS"));
 
-        gate.await(10, TimeUnit.SECONDS);
         service.verify(1, postRequestedFor(urlEqualTo("/datastream"))
                 .withRequestBody(equalToJson(event("SUCCESS"))));
-
-        // wait till flume reads any responses before shutting down
-        new CountDownLatch(1).await(200, TimeUnit.MILLISECONDS);
     }
 
     @Test
     public void ensureAuditEventsResentOn503Failure() throws Exception {
-        final CountDownLatch gate = new CountDownLatch(2);
-
-        service.addMockServiceRequestListener((request, response) -> gate.countDown());
-
         String errorScenario = "Error Scenario";
 
         service.stubFor(post(urlEqualTo("/datastream"))
@@ -105,20 +99,12 @@ public class HttpSinkIT {
         addEventToChannel(event("TRANSIENT_ERROR"), false, Status.BACKOFF);
         addEventToChannel(event("TRANSIENT_ERROR"), true, Status.READY);
 
-        gate.await(20, TimeUnit.SECONDS);
         service.verify(2, postRequestedFor(urlEqualTo("/datastream"))
                 .withRequestBody(equalToJson(event("TRANSIENT_ERROR"))));
-
-        // wait till flume reads any responses before shutting down
-        new CountDownLatch(1).await(200, TimeUnit.MILLISECONDS);
     }
 
     @Test
     public void ensureAuditEventsResentOnNetworkFailure() throws Exception {
-        final CountDownLatch gate = new CountDownLatch(2);
-
-        service.addMockServiceRequestListener((request, response) -> gate.countDown());
-
         String errorScenario = "Error Scenario";
 
         service.stubFor(post(urlEqualTo("/datastream"))
@@ -137,25 +123,18 @@ public class HttpSinkIT {
         addEventToChannel(event("NETWORK_ERROR"), false, Status.BACKOFF);
         addEventToChannel(event("NETWORK_ERROR"), true, Status.READY);
 
-        gate.await(10, TimeUnit.SECONDS);
         service.verify(2, postRequestedFor(urlEqualTo("/datastream"))
                 .withRequestBody(equalToJson(event("NETWORK_ERROR"))));
-
-        // wait till flume reads any responses before shutting down
-        new CountDownLatch(1).await(200, TimeUnit.MILLISECONDS);
     }
 
     @Test
     public void ensureAuditEventsResentOnConnectionTimeout() throws Exception {
-        final CountDownLatch gate = new CountDownLatch(2);
-
+        service.addSocketAcceptDelay(new RequestDelaySpec(CONNECT_TIMEOUT));
         service.addMockServiceRequestListener((request, response) -> {
-                gate.countDown();
                 service.addSocketAcceptDelay(new RequestDelaySpec(0));
             }
         );
 
-        service.addSocketAcceptDelay(new RequestDelaySpec(CONNECT_TIMEOUT));
         service.stubFor(post(urlEqualTo("/datastream"))
                 .withRequestBody(equalToJson(event("SLOW_SOCKET")))
                 .willReturn(aResponse().withStatus(200)));
@@ -163,20 +142,12 @@ public class HttpSinkIT {
         addEventToChannel(event("SLOW_SOCKET"), false, Status.BACKOFF);
         addEventToChannel(event("SLOW_SOCKET"), true, Status.READY);
 
-        gate.await(10, TimeUnit.SECONDS);
         service.verify(2, postRequestedFor(urlEqualTo("/datastream"))
                 .withRequestBody(equalToJson(event("SLOW_SOCKET"))));
-
-        // wait till flume reads any responses before shutting down
-        new CountDownLatch(1).await(200, TimeUnit.MILLISECONDS);
     }
 
     @Test
     public void ensureAuditEventsResentOnRequestTimeout() throws Exception {
-        final CountDownLatch gate = new CountDownLatch(2);
-
-        service.addMockServiceRequestListener((request, response) -> gate.countDown());
-
         String errorScenario = "Error Scenario";
 
         service.stubFor(post(urlEqualTo("/datastream"))
@@ -195,12 +166,30 @@ public class HttpSinkIT {
         addEventToChannel(event("SLOW_RESPONSE"), false, Status.BACKOFF);
         addEventToChannel(event("SLOW_RESPONSE"), true, Status.READY);
 
-        gate.await(10, TimeUnit.SECONDS);
         service.verify(2, postRequestedFor(urlEqualTo("/datastream"))
                 .withRequestBody(equalToJson(event("SLOW_RESPONSE"))));
+    }
 
-        // wait till flume reads any responses before shutting down
-        new CountDownLatch(1).await(200, TimeUnit.MILLISECONDS);
+    @Test
+    public void ensureHttpConnectionReusedForSuccessfulRequests() throws Exception {
+        // we should only get one delay when establishing a connection
+        service.addSocketAcceptDelay(new RequestDelaySpec(1000));
+
+        service.stubFor(post(urlEqualTo("/datastream"))
+                .withRequestBody(equalToJson(event("SUCCESS")))
+                .willReturn(aResponse().withStatus(200)));
+
+        long startTime = System.currentTimeMillis();
+
+        addEventToChannel(event("SUCCESS"), true, Status.READY);
+        addEventToChannel(event("SUCCESS"), true, Status.READY);
+        addEventToChannel(event("SUCCESS"), true, Status.READY);
+
+        long endTime = System.currentTimeMillis();
+        assert(endTime - startTime < 2500);
+
+        service.verify(3, postRequestedFor(urlEqualTo("/datastream"))
+                .withRequestBody(equalToJson(event("SUCCESS"))));
     }
 
     private void addEventToChannel(String line) throws EventDeliveryException {
@@ -221,9 +210,9 @@ public class HttpSinkIT {
         assert(status == expectedStatus);
 
         if (commitTx) {
-            verify(transaction).commit();
+            inOrder(transaction).verify(transaction).commit();
         } else {
-            verify(transaction).rollback();
+            inOrder(transaction).verify(transaction).rollback();
         }
     }
 

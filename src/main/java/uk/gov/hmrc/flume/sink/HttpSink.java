@@ -132,6 +132,9 @@ public class HttpSink extends AbstractSink implements Configurable {
 					int statusCode = httpClient.getResponseCode();
 					LOG.debug("Got status code : " + statusCode);
 
+					httpClient.getInputStream().close();
+					LOG.debug("Response processed and closed");
+
 					if (statusCode == HttpURLConnection.HTTP_OK) {
 						txn.commit();
 						status = Status.READY;
@@ -166,21 +169,16 @@ public class HttpSink extends AbstractSink implements Configurable {
 				} catch (IOException e) {
 					txn.rollback();
 
-					LOG.error("Error opening connection", e);
+					LOG.error("Error opening connection, or request timed out", e);
 
 					status = Status.BACKOFF;
-
-				} finally {
-					httpClient.disconnect();
-
-					LOG.debug("Connection Closed");
 				}
 
 			} else {
 				txn.commit();
 				status = Status.BACKOFF;
 
-				LOG.debug("Processed empty event.");
+				LOG.debug("Processed empty event");
 			}
 
 		} catch (Throwable t) {
