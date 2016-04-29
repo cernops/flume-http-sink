@@ -2,6 +2,7 @@ package uk.gov.hmrc.flume.sink;
 
 import org.apache.flume.*;
 import org.apache.flume.conf.Configurable;
+import org.apache.flume.instrumentation.SinkCounter;
 import org.apache.flume.sink.AbstractSink;
 import org.apache.log4j.Logger;
 
@@ -62,6 +63,8 @@ public class HttpSink extends AbstractSink implements Configurable {
     private String contentTypeHeader = DEFAULT_CONTENT_TYPE;
     private String acceptHeader = DEFAULT_ACCEPT_HEADER;
 
+    private SinkCounter sinkCounter;
+
     public void configure(Context context) {
         String configuredEndpoint = context.getString("endpoint", "");
         LOG.info("Read endpoint URL from configuration : " + configuredEndpoint);
@@ -89,16 +92,22 @@ public class HttpSink extends AbstractSink implements Configurable {
 
         contentTypeHeader = context.getString("contentTypeHeader", DEFAULT_CONTENT_TYPE);
         LOG.info("Using Content-Type header value : " + contentTypeHeader);
+
+        if(this.sinkCounter == null) {
+            this.sinkCounter = new SinkCounter(this.getName());
+        }
     }
 
     @Override
     public void start() {
         LOG.info("Starting HttpSink");
+        sinkCounter.start();
     }
 
     @Override
     public void stop() {
         LOG.info("Stopping HttpSink");
+        sinkCounter.stop();
     }
 
     public Status process() throws EventDeliveryException {
@@ -109,6 +118,8 @@ public class HttpSink extends AbstractSink implements Configurable {
         txn.begin();
         try {
             Event event = ch.take();
+            sinkCounter.incrementEventDrainAttemptCount();
+
             if (event != null && event.getBody().length > 0) {
 
                 LOG.debug("Sending request : " + new String(event.getBody()));
@@ -138,6 +149,7 @@ public class HttpSink extends AbstractSink implements Configurable {
                     if (statusCode == HttpURLConnection.HTTP_OK) {
                         txn.commit();
                         status = Status.READY;
+                        sinkCounter.incrementEventDrainSuccessCount();
 
                         LOG.debug("Successful write, event consumed");
 
@@ -150,6 +162,7 @@ public class HttpSink extends AbstractSink implements Configurable {
                     } else if (statusCode >= 400 && statusCode < 500) {
                         txn.commit();
                         status = Status.READY;
+                        sinkCounter.incrementEventDrainSuccessCount();
 
                         LOG.error(String.format("Bad request, returned status code %s, event consumed", statusCode));
 
@@ -162,6 +175,7 @@ public class HttpSink extends AbstractSink implements Configurable {
                     } else {
                         txn.commit();
                         status = Status.READY;
+                        sinkCounter.incrementEventDrainSuccessCount();
 
                         LOG.error(String.format("Unexpected status code %s returned for event", statusCode));
                     }
@@ -177,6 +191,7 @@ public class HttpSink extends AbstractSink implements Configurable {
             } else {
                 txn.commit();
                 status = Status.BACKOFF;
+                sinkCounter.incrementEventDrainSuccessCount();
 
                 LOG.debug("Processed empty event");
             }
@@ -198,5 +213,9 @@ public class HttpSink extends AbstractSink implements Configurable {
         }
 
         return status;
+    }
+
+    public void setSinkCounter(SinkCounter sinkCounter) {
+        this.sinkCounter = sinkCounter;
     }
 }

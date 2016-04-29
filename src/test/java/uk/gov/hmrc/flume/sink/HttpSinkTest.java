@@ -4,6 +4,7 @@ import static org.mockito.Mockito.*;
 
 import org.apache.flume.*;
 import org.apache.flume.Sink.Status;
+import org.apache.flume.instrumentation.SinkCounter;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -17,6 +18,9 @@ public class HttpSinkTest {
     private static final Integer DEFAULT_CONNECT_TIMEOUT = 5000;
     private static final String DEFAULT_ACCEPT_HEADER = "text/plain";
     private static final String DEFAULT_CONTENT_TYPE_HEADER = "text/plain";
+
+    @Mock
+    private SinkCounter sinkCounter;
 
     @Mock
     private Context configContext;
@@ -129,17 +133,20 @@ public class HttpSinkTest {
         HttpSink httpSink = new HttpSink();
         httpSink.configure(context);
         httpSink.setChannel(channel);
+        httpSink.setSinkCounter(sinkCounter);
         Status status = httpSink.process();
 
         assert(status == Status.BACKOFF);
 
-        verify(transaction).begin();
+        inOrder(transaction).verify(transaction).begin();
+        verify(sinkCounter).incrementEventDrainAttemptCount();
         if (commit) {
-            verify(transaction).commit();
+            inOrder(transaction).verify(transaction).commit();
+            verify(sinkCounter).incrementEventDrainSuccessCount();
         } else {
-            verify(transaction).rollback();
+            inOrder(transaction).verify(transaction).rollback();
         }
-        verify(transaction).close();
+        inOrder(transaction).verify(transaction).close();
     }
 
     private void whenDefaultStringConfig() {

@@ -11,6 +11,7 @@ import com.github.tomakehurst.wiremock.http.Fault;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import org.apache.flume.*;
 import org.apache.flume.event.SimpleEvent;
+import org.apache.flume.instrumentation.SinkCounter;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -35,6 +36,9 @@ public class HttpSinkIT {
     private HttpSink httpSink;
 
     @Mock
+    private SinkCounter sinkCounter;
+
+    @Mock
     private Channel channel;
 
     @Mock
@@ -46,20 +50,22 @@ public class HttpSinkIT {
             Context context = new Context();
             context.put("endpoint", "http://localhost:8080/datastream");
             context.put("requestTimeout", "2000");
-            context.put("connectTimeout", "2000");
+            context.put("connectTimeout", "1500");
             context.put("acceptHeader", "application/json");
             context.put("contentTypeHeader", "application/json");
 
             httpSink = new HttpSink();
             httpSink.configure(context);
             httpSink.setChannel(channel);
+            httpSink.setSinkCounter(sinkCounter);
             httpSink.start();
         }
     }
 
     @After
     public void waitForShutdown() throws InterruptedException {
-        new CountDownLatch(1).await(200, TimeUnit.MILLISECONDS);
+        httpSink.stop();
+        new CountDownLatch(1).await(500, TimeUnit.MILLISECONDS);
     }
 
     @Rule
