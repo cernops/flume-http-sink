@@ -32,14 +32,24 @@ event being consumed from the channel.
 
 ### Configuration Options
 
- Name            | Default          | Description
-:----------------|:-----------------|:-----------------
-endpoint         | no default       | the fully qualified URL endpoint to POST to
-connectTimeout   | 5000ms           | the socket connection timeout
-requestTimeout   | 5000ms           | the maximum request processing time
-contentTypeHeader| text/plain       | the HTTP Content-Type header
-acceptHeader     | text/plain       | the HTTP Accept header value
+ Name                    | Default          | Description
+:------------------------|:-----------------|:-----------------
+endpoint                 | no default       | the fully qualified URL endpoint to POST to
+connectTimeout           | 5000ms           | the socket connection timeout
+requestTimeout           | 5000ms           | the maximum request processing time
+contentTypeHeader        | text/plain       | the HTTP Content-Type header
+acceptHeader             | text/plain       | the HTTP Accept header value
+defaultBackoff           | true             | whether to backoff by default on receiving all HTTP status codes
+defaultRollback          | true             | whether to rollback by default on receiving all HTTP status codes
+defaultIncrementMetrics  | false            | whether to increment metrics by default on receiving all HTTP status codes
+backoff.CODE             | no default       | configures a specific backoff for an individual (i.e. 200) code or a group (i.e. 2XX) code
+rollback.CODE            | no default       | configures a specific rollback for an individual (i.e. 200) code or a group (i.e. 2XX) code
+incrementMetrics.CODE    | no default       | configures a specific metrics increment for an individual (i.e. 200) code or a group (i.e. 2XX) code
 
+Note that the most specific HTTP status code match is used for the backoff,
+rollback and incrementMetrics configuration options. If there are configuration
+values for both 2XX and 200 status codes, then 200 HTTP codes will use the 200
+value, and all other HTTP codes in the 201-299 range will use the 2XX value.
 
 ### Configuration Example
 An example flume-conf.properties section for this sink :
@@ -51,6 +61,15 @@ agent.sinks.httpSink.connectTimeout = 2000
 agent.sinks.httpSink.requestTimeout = 2000
 agent.sinks.httpSink.acceptHeader = application/json
 agent.sinks.httpSink.contentTypeHeader = application/json
+agent.sinks.httpSink.defaultBackoff = true
+agent.sinks.httpSink.defaultRollback = true
+agent.sinks.httpSink.defaultIncrementMetrics = false
+agent.sinks.httpSink.backoff.4XX = false
+agent.sinks.httpSink.rollback.4XX = false
+agent.sinks.httpSink.incrementMetrics.4XX = true
+agent.sinks.httpSink.backoff.200 = false
+agent.sinks.httpSink.rollback.200 = false
+agent.sinks.httpSink.incrementMetrics.200 = true
 ```
 
 
@@ -64,11 +83,6 @@ cd flume-http-sink
 sbt clean package
 cp target/flume-http-sink-{version}.jar {flume_home}/lib/flume-http-sink-{version}.jar
 ```
-
-### Todo
-
-* Configurable behaviour for HTTP response status codes.
-* Performance tests.
 
 
 ### License

@@ -23,11 +23,9 @@ libraryDependencies ++= Seq(
     "com.fasterxml.jackson.core" % "jackson-core" % "2.3.1",
     "junit" % "junit-dep" % "4.10" % "test",
     "com.github.tomakehurst" % "wiremock" % "1.56" % "test",
+    "com.google.collections" % "google-collections" % "1.0",
     "com.novocode" % "junit-interface" % "0.11" % "test",
     "org.mockito" % "mockito-all" % "1.10.19" % "test"
 )
 
 resolvers += Resolver.mavenLocal
-
-testOptions += Tests.Argument(TestFrameworks.JUnit,
-    "--exclude-categories=uk.gov.hmrc.flume.sink.IntegrationTest")

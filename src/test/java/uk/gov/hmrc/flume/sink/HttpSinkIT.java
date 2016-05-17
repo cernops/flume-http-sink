@@ -48,11 +48,14 @@ public class HttpSinkIT {
     public void setupSink() {
         if (httpSink == null) {
             Context context = new Context();
-            context.put("endpoint", "http://localhost:8080/datastream");
+            context.put("endpoint", "http://localhost:8080/endpoint");
             context.put("requestTimeout", "2000");
             context.put("connectTimeout", "1500");
             context.put("acceptHeader", "application/json");
             context.put("contentTypeHeader", "application/json");
+            context.put("backoff.200", "false");
+            context.put("rollback.200", "false");
+            context.put("incrementMetrics.200", "true");
 
             httpSink = new HttpSink();
             httpSink.configure(context);
@@ -73,13 +76,13 @@ public class HttpSinkIT {
 
     @Test
     public void ensureSuccessfulMessageDelivery() throws Exception {
-        service.stubFor(post(urlEqualTo("/datastream"))
+        service.stubFor(post(urlEqualTo("/endpoint"))
                 .withRequestBody(equalToJson(event("SUCCESS")))
                 .willReturn(aResponse().withStatus(200)));
 
         addEventToChannel(event("SUCCESS"));
 
-        service.verify(1, postRequestedFor(urlEqualTo("/datastream"))
+        service.verify(1, postRequestedFor(urlEqualTo("/endpoint"))
                 .withRequestBody(equalToJson(event("SUCCESS"))));
     }
 
@@ -87,14 +90,14 @@ public class HttpSinkIT {
     public void ensureEventsResentOn503Failure() throws Exception {
         String errorScenario = "Error Scenario";
 
-        service.stubFor(post(urlEqualTo("/datastream"))
+        service.stubFor(post(urlEqualTo("/endpoint"))
                 .inScenario(errorScenario)
                 .whenScenarioStateIs(STARTED)
                 .withRequestBody(equalToJson(event("TRANSIENT_ERROR")))
                 .willReturn(aResponse().withStatus(503))
                 .willSetStateTo("Error Sent"));
 
-        service.stubFor(post(urlEqualTo("/datastream"))
+        service.stubFor(post(urlEqualTo("/endpoint"))
                 .inScenario(errorScenario)
                 .whenScenarioStateIs("Error Sent")
                 .withRequestBody(equalToJson(event("TRANSIENT_ERROR")))
@@ -103,7 +106,7 @@ public class HttpSinkIT {
         addEventToChannel(event("TRANSIENT_ERROR"), false, Status.BACKOFF);
         addEventToChannel(event("TRANSIENT_ERROR"), true, Status.READY);
 
-        service.verify(2, postRequestedFor(urlEqualTo("/datastream"))
+        service.verify(2, postRequestedFor(urlEqualTo("/endpoint"))
                 .withRequestBody(equalToJson(event("TRANSIENT_ERROR"))));
     }
 
@@ -111,14 +114,14 @@ public class HttpSinkIT {
     public void ensureEventsResentOnNetworkFailure() throws Exception {
         String errorScenario = "Error Scenario";
 
-        service.stubFor(post(urlEqualTo("/datastream"))
+        service.stubFor(post(urlEqualTo("/endpoint"))
                 .inScenario(errorScenario)
                 .whenScenarioStateIs(STARTED)
                 .withRequestBody(equalToJson(event("NETWORK_ERROR")))
                 .willReturn(aResponse().withFault(Fault.RANDOM_DATA_THEN_CLOSE))
                 .willSetStateTo("Error Sent"));
 
-        service.stubFor(post(urlEqualTo("/datastream"))
+        service.stubFor(post(urlEqualTo("/endpoint"))
                 .inScenario(errorScenario)
                 .whenScenarioStateIs("Error Sent")
                 .withRequestBody(equalToJson(event("NETWORK_ERROR")))
@@ -127,7 +130,7 @@ public class HttpSinkIT {
         addEventToChannel(event("NETWORK_ERROR"), false, Status.BACKOFF);
         addEventToChannel(event("NETWORK_ERROR"), true, Status.READY);
 
-        service.verify(2, postRequestedFor(urlEqualTo("/datastream"))
+        service.verify(2, postRequestedFor(urlEqualTo("/endpoint"))
                 .withRequestBody(equalToJson(event("NETWORK_ERROR"))));
     }
 
@@ -139,14 +142,14 @@ public class HttpSinkIT {
             }
         );
 
-        service.stubFor(post(urlEqualTo("/datastream"))
+        service.stubFor(post(urlEqualTo("/endpoint"))
                 .withRequestBody(equalToJson(event("SLOW_SOCKET")))
                 .willReturn(aResponse().withStatus(200)));
 
         addEventToChannel(event("SLOW_SOCKET"), false, Status.BACKOFF);
         addEventToChannel(event("SLOW_SOCKET"), true, Status.READY);
 
-        service.verify(2, postRequestedFor(urlEqualTo("/datastream"))
+        service.verify(2, postRequestedFor(urlEqualTo("/endpoint"))
                 .withRequestBody(equalToJson(event("SLOW_SOCKET"))));
     }
 
@@ -154,14 +157,14 @@ public class HttpSinkIT {
     public void ensureEventsResentOnRequestTimeout() throws Exception {
         String errorScenario = "Error Scenario";
 
-        service.stubFor(post(urlEqualTo("/datastream"))
+        service.stubFor(post(urlEqualTo("/endpoint"))
                 .inScenario(errorScenario)
                 .whenScenarioStateIs(STARTED)
                 .withRequestBody(equalToJson(event("SLOW_RESPONSE")))
                 .willReturn(aResponse().withFixedDelay(RESPONSE_TIMEOUT).withStatus(200))
                 .willSetStateTo("Slow Response Sent"));
 
-        service.stubFor(post(urlEqualTo("/datastream"))
+        service.stubFor(post(urlEqualTo("/endpoint"))
                 .inScenario(errorScenario)
                 .whenScenarioStateIs("Slow Response Sent")
                 .withRequestBody(equalToJson(event("SLOW_RESPONSE")))
@@ -170,7 +173,7 @@ public class HttpSinkIT {
         addEventToChannel(event("SLOW_RESPONSE"), false, Status.BACKOFF);
         addEventToChannel(event("SLOW_RESPONSE"), true, Status.READY);
 
-        service.verify(2, postRequestedFor(urlEqualTo("/datastream"))
+        service.verify(2, postRequestedFor(urlEqualTo("/endpoint"))
                 .withRequestBody(equalToJson(event("SLOW_RESPONSE"))));
     }
 
@@ -179,7 +182,7 @@ public class HttpSinkIT {
         // we should only get one delay when establishing a connection
         service.addSocketAcceptDelay(new RequestDelaySpec(1000));
 
-        service.stubFor(post(urlEqualTo("/datastream"))
+        service.stubFor(post(urlEqualTo("/endpoint"))
                 .withRequestBody(equalToJson(event("SUCCESS")))
                 .willReturn(aResponse().withStatus(200)));
 
@@ -192,7 +195,7 @@ public class HttpSinkIT {
         long endTime = System.currentTimeMillis();
         assert(endTime - startTime < 2500);
 
-        service.verify(3, postRequestedFor(urlEqualTo("/datastream"))
+        service.verify(3, postRequestedFor(urlEqualTo("/endpoint"))
                 .withRequestBody(equalToJson(event("SUCCESS"))));
     }
 
