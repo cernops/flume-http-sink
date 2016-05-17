@@ -9,25 +9,13 @@ send those events to a remote service using an HTTP POST request. The event
 content is sent as the POST body.
 
 Error handling behaviour of this sink depends on the HTTP response returned
-by the target server. Any transient error will be retried forever, and any
-invalid events will be discarded.
-
-Status code 200 (OK) responses result in successful consumption of the event.
-
-Status code 503 (UNAVAILABLE) responses result in a backoff signal being
-returned by the sink, and the event is not consumed from the channel.
-
-Status codes in the range of 400-499 result in the event being consumed from
-the channel and discarded, as they are considered to be corrupt events that
-can never be successfully sent to the HTTP endpoint. An error log message is
-created for each of these failed events.
+by the target server. The sink backoff/ready status is configurable, as is the
+transaction commit/rollback result and whether the event contributes to the
+successful event drain count.
 
 Any malformed HTTP response returned by the server where the status code is
 not readable will result in a backoff signal and the event is not consumed
 from the channel.
-
-Any other HTTP response will result in an error log being created, and the
-event being consumed from the channel.
 
 
 ### Configuration Options

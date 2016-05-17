@@ -204,10 +204,9 @@ public class HttpSink extends AbstractSink implements Configurable {
 
                 } catch (IOException e) {
                     txn.rollback();
+                    status = Status.BACKOFF;
 
                     LOG.error("Error opening connection, or request timed out", e);
-
-                    status = Status.BACKOFF;
                 }
 
             } else {
@@ -220,10 +219,9 @@ public class HttpSink extends AbstractSink implements Configurable {
 
         } catch (Throwable t) {
             txn.rollback();
+            status = Status.BACKOFF;
 
             LOG.error("Error sending HTTP request, retrying", t);
-
-            status = Status.BACKOFF;
 
             // re-throw all Errors
             if (t instanceof Error) {
