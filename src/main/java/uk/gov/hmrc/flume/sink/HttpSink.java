@@ -112,16 +112,22 @@ public class HttpSink extends AbstractSink implements Configurable {
 
     public Status process() throws EventDeliveryException {
         Status status = null;
+        OutputStream outputStream = null;
 
         Channel ch = getChannel();
         Transaction txn = ch.getTransaction();
         txn.begin();
+
         try {
             Event event = ch.take();
             sinkCounter.incrementEventDrainAttemptCount();
 
-            if (event != null && event.getBody().length > 0) {
+            byte[] eventBody = null;
+            if (event != null) {
+                eventBody = event.getBody();
+            }
 
+            if (eventBody != null && eventBody.length > 0) {
                 LOG.debug("Sending request : " + new String(event.getBody()));
 
                 try {
@@ -135,8 +141,8 @@ public class HttpSink extends AbstractSink implements Configurable {
                     httpClient.setDoInput(true);
                     httpClient.connect();
 
-                    OutputStream outputStream = httpClient.getOutputStream();
-                    outputStream.write(event.getBody());
+                    outputStream = httpClient.getOutputStream();
+                    outputStream.write(eventBody);
                     outputStream.flush();
                     outputStream.close();
 
@@ -210,6 +216,14 @@ public class HttpSink extends AbstractSink implements Configurable {
 
         } finally {
             txn.close();
+
+            if (outputStream != null) {
+                try {
+                    outputStream.close();
+                } catch (IOException e) {
+                    // ignore errors
+                }
+            }
         }
 
         return status;

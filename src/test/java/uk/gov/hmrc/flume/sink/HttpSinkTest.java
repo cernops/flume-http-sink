@@ -113,20 +113,25 @@ public class HttpSinkTest {
 
     @Test
     public void ensureBackoffOnNullEvent() throws Exception {
-        when(channel.getTransaction()).thenReturn(transaction);
         when(channel.take()).thenReturn(null);
-        executeWithMockedChannel(true);
+        executeWithMocks(true);
+    }
+
+    @Test
+    public void ensureBackoffOnNullEventBody() throws Exception {
+        when(channel.take()).thenReturn(event);
+        when(event.getBody()).thenReturn(null);
+        executeWithMocks(true);
     }
 
     @Test
     public void ensureBackoffOnEmptyEvent() throws Exception {
-        when(channel.getTransaction()).thenReturn(transaction);
         when(channel.take()).thenReturn(event);
         when(event.getBody()).thenReturn(new byte[] {});
-        executeWithMockedChannel(true);
+        executeWithMocks(true);
     }
 
-    private void executeWithMockedChannel(boolean commit) throws EventDeliveryException {
+    private void executeWithMocks(boolean commit) throws EventDeliveryException {
         Context context = new Context();
         context.put("endpoint", "http://localhost:8080/endpoint");
 
@@ -134,6 +139,9 @@ public class HttpSinkTest {
         httpSink.configure(context);
         httpSink.setChannel(channel);
         httpSink.setSinkCounter(sinkCounter);
+
+        when(channel.getTransaction()).thenReturn(transaction);
+
         Status status = httpSink.process();
 
         assert(status == Status.BACKOFF);
