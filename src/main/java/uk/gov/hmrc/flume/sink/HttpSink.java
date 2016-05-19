@@ -142,7 +142,6 @@ public class HttpSink extends AbstractSink implements Configurable {
 
         try {
             Event event = ch.take();
-            sinkCounter.incrementEventDrainAttemptCount();
 
             byte[] eventBody = null;
             if (event != null) {
@@ -150,6 +149,7 @@ public class HttpSink extends AbstractSink implements Configurable {
             }
 
             if (eventBody != null && eventBody.length > 0) {
+                sinkCounter.incrementEventDrainAttemptCount();
                 LOG.debug("Sending request : " + new String(event.getBody()));
 
                 try {
@@ -199,7 +199,7 @@ public class HttpSink extends AbstractSink implements Configurable {
                         txn.rollback();
                         status = Status.BACKOFF;
 
-                        LOG.debug("Malformed response returned from server, retrying");
+                        LOG.warn("Malformed response returned from server, retrying");
                     }
 
                 } catch (IOException e) {
@@ -211,10 +211,9 @@ public class HttpSink extends AbstractSink implements Configurable {
 
             } else {
                 txn.commit();
-                status = Status.READY;
-                sinkCounter.incrementEventDrainSuccessCount();
+                status = Status.BACKOFF;
 
-                LOG.debug("Processed empty event");
+                LOG.warn("Processed empty event");
             }
 
         } catch (Throwable t) {
@@ -248,7 +247,7 @@ public class HttpSink extends AbstractSink implements Configurable {
 
         if (config != null) {
             config.entrySet().stream().forEach(value -> {
-                LOG.debug(String.format("Read %s value for status code %s as %s", propertyName, value.getKey(), value.getValue()));
+                LOG.info(String.format("Read %s value for status code %s as %s", propertyName, value.getKey(), value.getValue()));
 
                 if (override.containsKey(value.getKey())) {
                     LOG.warn(String.format("Ignoring duplicate config value for %s.%s", propertyName, value.getKey()));

@@ -130,20 +130,20 @@ public class HttpSinkTest {
     }
 
     @Test
-    public void ensureReadyOnNullEvent() throws Exception {
+    public void ensureBackoffOnNullEvent() throws Exception {
         when(channel.take()).thenReturn(null);
         executeWithMocks(true);
     }
 
     @Test
-    public void ensureReadyOnNullEventBody() throws Exception {
+    public void ensureBackoffOnNullEventBody() throws Exception {
         when(channel.take()).thenReturn(event);
         when(event.getBody()).thenReturn(null);
         executeWithMocks(true);
     }
 
     @Test
-    public void ensureReadyOnEmptyEvent() throws Exception {
+    public void ensureBackoffOnEmptyEvent() throws Exception {
         when(channel.take()).thenReturn(event);
         when(event.getBody()).thenReturn(new byte[] {});
         executeWithMocks(true);
@@ -159,7 +159,7 @@ public class HttpSinkTest {
         context.put("defaultBackoff", "true");
         context.put("defaultIncrementMetrics", "true");
 
-        executeWithMocks(false, Status.BACKOFF, true, context, HttpURLConnection.HTTP_OK);
+        executeWithMocks(false, Status.BACKOFF, true, true, context, HttpURLConnection.HTTP_OK);
     }
 
     @Test
@@ -172,7 +172,7 @@ public class HttpSinkTest {
         context.put("defaultBackoff", "false");
         context.put("defaultIncrementMetrics", "false");
 
-        executeWithMocks(true, Status.READY, false, context, HttpURLConnection.HTTP_OK);
+        executeWithMocks(true, Status.READY, false, false, context, HttpURLConnection.HTTP_OK);
     }
 
     @Test
@@ -188,7 +188,7 @@ public class HttpSinkTest {
         context.put("backoff.200", "false");
         context.put("incrementMetrics.200", "true");
 
-        executeWithMocks(true, Status.READY, true, context, HttpURLConnection.HTTP_OK);
+        executeWithMocks(true, Status.READY, true, true, context, HttpURLConnection.HTTP_OK);
     }
 
     @Test
@@ -204,8 +204,8 @@ public class HttpSinkTest {
         context.put("backoff.2XX", "false");
         context.put("incrementMetrics.2XX", "true");
 
-        executeWithMocks(true, Status.READY, true, context, HttpURLConnection.HTTP_OK);
-        executeWithMocks(true, Status.READY, true, context, HttpURLConnection.HTTP_NO_CONTENT);
+        executeWithMocks(true, Status.READY, true, true, context, HttpURLConnection.HTTP_OK);
+        executeWithMocks(true, Status.READY, true, true, context, HttpURLConnection.HTTP_NO_CONTENT);
     }
 
     @Test
@@ -221,16 +221,18 @@ public class HttpSinkTest {
         context.put("backoff.200", "true");
         context.put("incrementMetrics.200", "false");
 
-        executeWithMocks(true, Status.READY, true, context, HttpURLConnection.HTTP_NO_CONTENT);
-        executeWithMocks(false, Status.BACKOFF, false, context, HttpURLConnection.HTTP_OK);
+        executeWithMocks(true, Status.READY, true, true, context, HttpURLConnection.HTTP_NO_CONTENT);
+        executeWithMocks(false, Status.BACKOFF, false, true, context, HttpURLConnection.HTTP_OK);
     }
 
     private void executeWithMocks(boolean commit) throws Exception {
         Context context = new Context();
-        executeWithMocks(commit, Status.READY, true, context, HttpURLConnection.HTTP_OK);
+        executeWithMocks(commit, Status.BACKOFF, false, false, context, HttpURLConnection.HTTP_OK);
     }
 
-    private void executeWithMocks(boolean expectedCommit, Status expectedStatus, boolean expectedIncrementMetrics,
+    private void executeWithMocks(boolean expectedCommit, Status expectedStatus,
+                                  boolean expectedIncrementSuccessMetrics,
+                                  boolean expectedIncrementAttemptMetrics,
                                   Context context, int httpStatus)
             throws Exception {
 
@@ -256,15 +258,21 @@ public class HttpSinkTest {
         assert(actualStatus == expectedStatus);
 
         inOrder(transaction).verify(transaction).begin();
-        inOrder(sinkCounter).verify(sinkCounter).incrementEventDrainAttemptCount();
+
+        if (expectedIncrementAttemptMetrics) {
+            inOrder(sinkCounter).verify(sinkCounter).incrementEventDrainAttemptCount();
+        }
+
         if (expectedCommit) {
             inOrder(transaction).verify(transaction).commit();
         } else {
             inOrder(transaction).verify(transaction).rollback();
         }
-        if (expectedIncrementMetrics) {
+
+        if (expectedIncrementSuccessMetrics) {
             inOrder(sinkCounter).verify(sinkCounter).incrementEventDrainSuccessCount();
         }
+
         inOrder(transaction).verify(transaction).close();
     }
 
