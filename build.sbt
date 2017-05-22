@@ -13,12 +13,12 @@ crossPaths := false
 autoScalaLibrary := false
 
 libraryDependencies ++= Seq(
-    "org.apache.flume" % "flume-ng-core" % "1.7.0-SNAPSHOT"
+    "org.apache.flume" % "flume-ng-core" % "1.7.0"
       exclude("org.apache.httpcomponents", "httpclient")
       exclude("commons-lang", "commons-lang")
       exclude("org.slf4j", "slf4j-api")
       exclude("com.google.guava", "guava"),
-    "org.apache.flume" % "flume-ng-sdk" % "1.7.0-SNAPSHOT"
+    "org.apache.flume" % "flume-ng-sdk" % "1.7.0"
       exclude("org.apache.thrift", "libthrift"),
     "com.fasterxml.jackson.core" % "jackson-core" % "2.3.1",
     "junit" % "junit-dep" % "4.10" % "test",
